@@ -14,15 +14,17 @@ def get_db_connection():
 def send_telegram_message(chat_id: int, text: str, reply_to: Optional[int] = None) -> bool:
     """Отправка сообщения через Telegram Bot API"""
     import urllib.request
-    import urllib.parse
     
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not bot_token:
+        print("TELEGRAM_BOT_TOKEN not set")
+        return False
+    
     url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
     
     data = {
         'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'HTML'
+        'text': text
     }
     if reply_to:
         data['reply_to_message_id'] = reply_to
@@ -33,8 +35,9 @@ def send_telegram_message(chat_id: int, text: str, reply_to: Optional[int] = Non
             data=json.dumps(data).encode('utf-8'),
             headers={'Content-Type': 'application/json'}
         )
-        urllib.request.urlopen(req)
-        return True
+        response = urllib.request.urlopen(req)
+        result = json.loads(response.read().decode('utf-8'))
+        return result.get('ok', False)
     except Exception as e:
         print(f"Error sending message: {e}")
         return False
@@ -235,7 +238,9 @@ def handler(event: dict, context) -> dict:
                 handle_ban_command(conn, chat_id, moderator_id, target_user_id, reason)
                 
                 username = target_user.get('username', target_user.get('first_name', 'Пользователь'))
-                send_telegram_message(chat_id, f"🚫 @{username} забанен!")
+                if username and not username.startswith('@'):
+                    username = f"@{username}"
+                send_telegram_message(chat_id, f"🚫 {username} забанен!")
         
         elif text.startswith('/mute'):
             if 'reply_to_message' in message:
@@ -260,7 +265,9 @@ def handler(event: dict, context) -> dict:
                 handle_mute_command(conn, chat_id, moderator_id, target_user_id, duration, reason)
                 
                 username = target_user.get('username', target_user.get('first_name', 'Пользователь'))
-                send_telegram_message(chat_id, f"🔇 @{username} получил мут на {duration} минут!")
+                if username and not username.startswith('@'):
+                    username = f"@{username}"
+                send_telegram_message(chat_id, f"🔇 {username} получил мут на {duration} минут!")
         
         elif text.startswith('/warn'):
             if 'reply_to_message' in message:
@@ -275,7 +282,9 @@ def handler(event: dict, context) -> dict:
                 result = handle_warn_command(conn, chat_id, moderator_id, target_user_id, reason)
                 
                 username = target_user.get('username', target_user.get('first_name', 'Пользователь'))
-                send_telegram_message(chat_id, f"{result}\nПользователь: @{username}")
+                if username and not username.startswith('@'):
+                    username = f"@{username}"
+                send_telegram_message(chat_id, f"{result}\nПользователь: {username}")
         
         elif text == '/stats':
             cur = conn.cursor()
@@ -292,28 +301,12 @@ def handler(event: dict, context) -> dict:
             cur.execute("SELECT COUNT(*) FROM mod_actions WHERE created_at > NOW() - INTERVAL '1 day'")
             today_actions = cur.fetchone()[0]
             
-            stats_text = f"""📊 <b>Статистика Барсика</b>
-
-👥 Всего пользователей: {total_users}
-🚫 Забанено: {banned}
-🔇 В муте: {muted}
-⚡️ Действий за сегодня: {today_actions}"""
+            stats_text = f"📊 Статистика Барсика\n\n👥 Всего пользователей: {total_users}\n🚫 Забанено: {banned}\n🔇 В муте: {muted}\n⚡️ Действий за сегодня: {today_actions}"
             
             send_telegram_message(chat_id, stats_text)
         
         elif text == '/help':
-            help_text = """🐱 <b>Команды бота Барсик</b>
-
-<b>Модерация:</b>
-/ban - забанить пользователя (ответ на сообщение)
-/mute [минуты] - мут (по умолчанию 60 мин)
-/warn - предупреждение (3 = автобан)
-
-<b>Информация:</b>
-/stats - статистика группы
-/help - это сообщение
-
-<i>Все команды работают через ответ на сообщение нарушителя</i>"""
+            help_text = "🐱 Команды бота Барсик\n\nМодерация:\n/ban - забанить пользователя (ответ на сообщение)\n/mute [минуты] - мут (по умолчанию 60 мин)\n/warn - предупреждение (3 = автобан)\n\nИнформация:\n/stats - статистика группы\n/help - это сообщение\n\nВсе команды работают через ответ на сообщение нарушителя"
             
             send_telegram_message(chat_id, help_text)
         
