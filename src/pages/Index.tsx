@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,21 +23,54 @@ interface Stat {
   color: string;
 }
 
+const API_URL = 'https://functions.poehali.dev/48dc2402-681e-464b-9465-d2c6845e6d1c';
+
 const Index = () => {
   const { toast } = useToast();
-  const [users] = useState<User[]>([
-    { id: 1, username: '@ivan_petrov', status: 'active', violations: 0 },
-    { id: 2, username: '@maria_sidorova', status: 'warned', violations: 1 },
-    { id: 3, username: '@spam_bot_123', status: 'muted', violations: 3 },
-    { id: 4, username: '@toxic_user', status: 'banned', violations: 5 },
+  const [users, setUsers] = useState<User[]>([]);
+  const [stats, setStats] = useState<Stat[]>([
+    { label: 'Всего участников', value: 0, icon: 'Users', color: 'text-primary' },
+    { label: 'Баны сегодня', value: 0, icon: 'UserX', color: 'text-destructive' },
+    { label: 'Муты сегодня', value: 0, icon: 'Volume2', color: 'text-orange-500' },
+    { label: 'Предупреждения', value: 0, icon: 'AlertTriangle', color: 'text-yellow-500' },
   ]);
+  const [loading, setLoading] = useState(true);
 
-  const [stats] = useState<Stat[]>([
-    { label: 'Всего участников', value: 247, icon: 'Users', color: 'text-primary' },
-    { label: 'Баны сегодня', value: 3, icon: 'UserX', color: 'text-destructive' },
-    { label: 'Муты сегодня', value: 5, icon: 'Volume2', color: 'text-orange-500' },
-    { label: 'Предупреждения', value: 12, icon: 'AlertTriangle', color: 'text-yellow-500' },
-  ]);
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(loadData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const [statsRes, usersRes] = await Promise.all([
+        fetch(`${API_URL}?action=stats`),
+        fetch(`${API_URL}?action=users`)
+      ]);
+      
+      const statsData = await statsRes.json();
+      const usersData = await usersRes.json();
+      
+      setStats([
+        { label: 'Всего участников', value: statsData.total_users, icon: 'Users', color: 'text-primary' },
+        { label: 'Баны сегодня', value: statsData.bans_today, icon: 'UserX', color: 'text-destructive' },
+        { label: 'Муты сегодня', value: statsData.mutes_today, icon: 'Volume2', color: 'text-orange-500' },
+        { label: 'Предупреждения', value: statsData.warns_today, icon: 'AlertTriangle', color: 'text-yellow-500' },
+      ]);
+      
+      setUsers(usersData.users.map((u: any) => ({
+        id: u.id,
+        username: u.username.startsWith('@') ? u.username : `@${u.username}`,
+        status: u.status,
+        violations: u.violations
+      })));
+      
+      setLoading(false);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
+  };
 
   const [autoModSettings, setAutoModSettings] = useState({
     spamFilter: true,

@@ -1,0 +1,31 @@
+{
+  "tests": [
+    {
+      "name": "Health check webhook endpoint",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "update_id": 123456,
+        "message": {
+          "message_id": 1,
+          "from": {
+            "id": 12345678,
+            "first_name": "Test",
+            "username": "testuser"
+          },
+          "chat": {
+            "id": -1001234567890,
+            "type": "supergroup"
+          },
+          "date": 1234567890,
+          "text": "/help"
+        }
+      },
+      "expectedStatus": 200,
+      "expectedBody": {
+        "ok": true
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}
